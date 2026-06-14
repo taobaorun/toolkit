@@ -1,0 +1,6 @@
+name: toolkit-extension
+description: Chrome extension with JSON viewer, Cookie inspector, Markdown reader, and AI Chat
+artifacts:
+  - type: chrome-extension
+    source_dir: .
+    output: toolkit-extension.zip

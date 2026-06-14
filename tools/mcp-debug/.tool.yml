@@ -1,0 +1,7 @@
+name: mcp-debug
+description: Debug MCP services via SSE or Streamable HTTP transport
+artifacts:
+  - type: cli
+    runtime: shell
+    entry: mcp-debug.sh
+    install: curl -sSL https://github.com/<user>/toolkit/raw/master/tools/mcp-debug/mcp-debug.sh -o /usr/local/bin/mcp-debug && chmod +x /usr/local/bin/mcp-debug

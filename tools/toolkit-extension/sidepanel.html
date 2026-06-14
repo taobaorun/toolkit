@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ToolKit</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="header">
+    <div class="logo">
+      <span class="logo-icon">T</span>
+      <span class="logo-text">ToolKit</span>
+    </div>
+    <div class="header-actions">
+      <button id="themeToggle" class="icon-btn" title="Toggle theme">
+        <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+        </svg>
+      </button>
+      <button id="expandBtn" class="icon-btn" title="Expand / collapse">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Tab Bar -->
+  <nav id="tabBar">
+    <button class="tab active" data-tab="json">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4a2 2 0 0 0-2 2v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2M17 4a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2"/></svg>
+      JSON
+    </button>
+    <button class="tab" data-tab="cookies">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9 4 4 0 0 1-5-5 4 4 0 0 1-4-4z"/><circle cx="9" cy="11.5" r="0.7" fill="currentColor" stroke="none"/><circle cx="13" cy="15" r="0.7" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="14.5" cy="11" r="0.6" fill="currentColor" stroke="none"/></svg>
+      Cookies
+    </button>
+    <button class="tab" data-tab="markdown">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/></svg>
+      Markdown
+    </button>
+    <button class="tab" data-tab="ai">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>
+      AI Chat
+    </button>
+  </nav>
+
+  <!-- Content Area -->
+  <main id="content"></main>
+
+  <script src="lib/marked.min.js"></script>
+  <script src="lib/json-editor.js"></script>
+  <script src="lib/json-compare.js"></script>
+  <script src="lib/cookies.js"></script>
+  <script src="lib/markdown.js"></script>
+  <script src="lib/ai-chat.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

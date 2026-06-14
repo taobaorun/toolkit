@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON Editor 增强 — 实施计划</title>
+  <style>
+    :root {
+      --ivory:    #FAF9F5;
+      --slate:    #141413;
+      --clay:     #D97757;
+      --oat:      #E3DACC;
+      --olive:    #788C5D;
+      --gray-150: #F0EEE6;
+      --gray-300: #D1CFC5;
+      --gray-500: #87867F;
+      --gray-700: #3D3D3A;
+      --white:    #FFFFFF;
+      --rust:     #B04A3F;
+
+      --serif: ui-serif, Georgia, 'Times New Roman', serif;
+      --sans:  system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --mono:  ui-monospace, 'SF Mono', Menlo, Monaco, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--ivory);
+      color: var(--gray-700);
+      line-height: 1.55;
+      padding: 56px 32px 120px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page { max-width: 960px; margin: 0 auto; }
+
+    /* ---------- header ---------- */
+    header.page-head { margin-bottom: 48px; max-width: 820px; }
+    .eyebrow {
+      font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--gray-500); margin-bottom: 12px;
+    }
+    h1 {
+      font-family: var(--serif); font-weight: 500; font-size: 36px;
+      line-height: 1.15; color: var(--slate); margin-bottom: 18px;
+      letter-spacing: -0.01em;
+    }
+    .prompt-box {
+      background: var(--gray-150); border: 1.5px solid var(--gray-300);
+      border-radius: 12px; padding: 16px 20px; font-size: 14.5px;
+      color: var(--gray-700);
+    }
+    .prompt-box .label {
+      font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--gray-500); display: block; margin-bottom: 6px;
+    }
+
+    /* ---------- section chrome ---------- */
+    section { margin-bottom: 64px; }
+    .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+    .sec-head .num {
+      font-family: var(--mono); font-size: 12px; background: var(--oat);
+      color: var(--slate); padding: 3px 9px; border-radius: 8px;
+    }
+    .sec-head h2 {
+      font-family: var(--serif); font-weight: 500; font-size: 26px;
+      color: var(--slate); letter-spacing: -0.01em;
+    }
+    .sec-intro {
+      font-size: 14.5px; color: var(--gray-500); max-width: 720px; margin-bottom: 28px;
+    }
+
+    /* ---------- summary strip ---------- */
+    .summary {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 64px;
+    }
+    @media (max-width: 900px) { .summary { grid-template-columns: repeat(2, 1fr); } }
+    .summary .cell {
+      background: var(--white); border: 1.5px solid var(--gray-300);
+      border-radius: 12px; padding: 18px 20px;
+    }
+    .summary .k {
+      font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--gray-500); margin-bottom: 6px;
+    }
+    .summary .v { font-size: 17px; color: var(--slate); font-weight: 600; }
+    .summary .v.accent { color: var(--clay); }
+
+    /* ---------- milestone timeline ---------- */
+    .milestones { display: flex; flex-direction: column; gap: 0; }
+    .milestone {
+      display: grid; grid-template-columns: 140px 28px 1fr;
+      gap: 0 18px; position: relative;
+    }
+    .milestone .when {
+      text-align: right; font-family: var(--mono); font-size: 12px;
+      color: var(--gray-500); padding-top: 4px;
+    }
+    .milestone .dot-col { display: flex; flex-direction: column; align-items: center; }
+    .milestone .dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--white); border: 3px solid var(--clay);
+      margin-top: 4px; flex-shrink: 0;
+    }
+    .milestone .dot.done { background: var(--olive); border-color: var(--olive); }
+    .milestone .line {
+      width: 2px; flex: 1; background: var(--gray-300); margin: 4px 0;
+    }
+    .milestone:last-child .line { display: none; }
+    .milestone .body { padding-bottom: 36px; }
+    .milestone .body h3 {
+      font-family: var(--serif); font-weight: 500; font-size: 19px;
+      color: var(--slate); margin-bottom: 4px;
+    }
+    .milestone .body p { font-size: 14px; color: var(--gray-500); margin-bottom: 10px; max-width: 620px; }
+    .milestone .tags { display: flex; gap: 8px; flex-wrap: wrap; }
+    .milestone .tag {
+      font-family: var(--mono); font-size: 11.5px; background: var(--gray-150);
+      border: 1px solid var(--gray-300); border-radius: 6px;
+      padding: 3px 8px; color: var(--gray-700);
+    }
+
+    /* ---------- file tree ---------- */
+    .diagram {
+      background: var(--white); border: 1.5px solid var(--gray-300);
+      border-radius: 12px; padding: 28px; overflow-x: auto;
+      font-family: var(--mono); font-size: 13px; line-height: 1.8;
+    }
+    .diagram .tree-root { color: var(--slate); }
+    .diagram .dir { color: var(--clay); font-weight: 600; }
+    .diagram .file { color: var(--gray-700); }
+    .diagram .file.mod { color: var(--rust); font-weight: 600; }
+    .diagram .file.new { color: var(--olive); font-weight: 600; }
+    .diagram .comment { color: var(--gray-500); font-size: 11.5px; margin-left: 8px; }
+    .diagram .tree-indent { display: inline-block; width: 20px; }
+    .caption { font-size: 13px; color: var(--gray-500); margin-top: 12px; }
+
+    /* ---------- decision list ---------- */
+    .decisions { display: flex; flex-direction: column; gap: 16px; max-width: 820px; }
+    .decision {
+      background: var(--white); border: 1.5px solid var(--gray-300);
+      border-left: 4px solid var(--clay); border-radius: 10px;
+      padding: 18px 22px;
+    }
+    .decision .d-num {
+      font-family: var(--mono); font-size: 11px; color: var(--clay);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;
+    }
+    .decision .d-title { font-weight: 600; font-size: 15px; color: var(--slate); margin-bottom: 6px; }
+    .decision .d-reason { font-size: 13.5px; color: var(--gray-500); }
+    .decision .d-alt {
+      font-size: 13px; color: var(--gray-500); margin-top: 8px;
+      padding: 8px 12px; background: var(--gray-150); border-radius: 6px;
+    }
+    .d-alt strong { color: var(--gray-700); }
+
+    /* ---------- code panel ---------- */
+    .code-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    @media (max-width: 980px) { .code-grid { grid-template-columns: 1fr; } }
+    .code-block { display: flex; flex-direction: column; gap: 10px; }
+    .code-block .file-label {
+      font-family: var(--mono); font-size: 12px; color: var(--gray-500);
+    }
+    .code {
+      background: var(--slate); border-radius: 12px;
+      padding: 18px 20px; overflow-x: auto; flex: 1;
+    }
+    .code pre {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.65;
+      color: #E8E6DE; white-space: pre;
+    }
+    .code .kw  { color: var(--clay); }
+    .code .str { color: var(--olive); }
+    .code .cm  { color: var(--gray-500); }
+    .code .fn  { color: #C9B98A; }
+    .code .num { color: #C9B98A; }
+
+    /* ---------- verify checklist ---------- */
+    .checklist { display: flex; flex-direction: column; gap: 8px; max-width: 820px; }
+    .check-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 14px 18px; background: var(--white);
+      border: 1.5px solid var(--gray-300); border-radius: 10px;
+    }
+    .check-item input[type="checkbox"] {
+      margin-top: 2px; width: 18px; height: 18px; accent-color: var(--olive);
+      flex-shrink: 0;
+    }
+    .check-item .ci-body { font-size: 13.5px; color: var(--gray-700); }
+    .check-item .ci-body .ci-title { font-weight: 600; color: var(--slate); display: block; margin-bottom: 2px; }
+    .check-item .ci-body .ci-desc { font-size: 12.5px; color: var(--gray-500); }
+
+    /* ---------- risk bar ---------- */
+    .risks {
+      border: 1.5px solid var(--gray-300); border-radius: 12px;
+      overflow: hidden; background: var(--white);
+    }
+    .risks .row {
+      display: grid; grid-template-columns: 1.6fr 90px 1.6fr; gap: 0;
+    }
+    @media (max-width: 780px) { .risks .row { grid-template-columns: 1fr; } }
+    .risks .row + .row { border-top: 1.5px solid var(--gray-300); }
+    .risks .cell { padding: 14px 18px; font-size: 13.5px; }
+    .risks .cell + .cell { border-left: 1.5px solid var(--gray-300); }
+    @media (max-width: 780px) { .risks .cell + .cell { border-left: none; border-top: 1px dashed var(--gray-300); } }
+    .risks .head { background: var(--gray-150); font-weight: 600; color: var(--slate); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .sev {
+      display: inline-block; font-family: var(--mono); font-size: 11px;
+      padding: 2px 8px; border-radius: 6px; font-weight: 600;
+    }
+    .sev.low  { background: #E4E9DC; color: #4B5C39; }
+    .sev.med  { background: var(--oat); color: var(--slate); }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="page-head">
+      <div class="eyebrow">ExecPlan · ToolKit Chrome Extension</div>
+      <h1>JSON Editor 增强</h1>
+      <div class="prompt-box">
+        <span class="label">目标</span>
+        ToolKit JSON 工具功能增强：Tree 模式可内联编辑、Code 模式带行号、操作齐全（Sort / Undo / Download / Upload）、Compare 支持结构化 diff。
+      </div>
+    </header>
+
+    <!-- ============================================================= -->
+
+    <div class="summary">
+      <div class="cell"><div class="k">受影响文件</div><div class="v accent">3 核心 + 2 微调</div></div>
+      <div class="cell"><div class="k">新增代码量</div><div class="v">~400 行 JS + ~200 行 CSS</div></div>
+      <div class="cell"><div class="k">步骤数</div><div class="v">6</div></div>
+      <div class="cell"><div class="k">外部依赖</div><div class="v">零</div></div>
+    </div>
+
+    <!-- ============================================================= -->
+
+    <section>
+      <div class="sec-head"><span class="num">01</span><h2>影响范围</h2></div>
+      <p class="sec-intro">核心改动集中在 <code>lib/json-editor.js</code>，这是唯一需要大幅重写的文件。其余文件是增量修改。</p>
+
+      <div class="diagram">
+        <div class="tree-root">
+          <span class="dir">tools/toolkit-extension/</span><br>
+          <span class="tree-indent"></span><span class="dir">lib/</span><br>
+          <span class="tree-indent"></span><span class="tree-indent"></span><span class="file mod">json-editor.js</span> <span class="comment">★ 大幅重写 ~250→~600 行</span><br>
+          <span class="tree-indent"></span><span class="tree-indent"></span><span class="file mod">json-compare.js</span> <span class="comment">结构化 diff 改造</span><br>
+          <span class="tree-indent"></span><span class="file mod">sidepanel.css</span> <span class="comment">+~200 行新样式</span><br>
+          <span class="tree-indent"></span><span class="file">sidepanel.js</span> <span class="comment">可能微调（路由不变）</span><br>
+          <span class="tree-indent"></span><span class="file">sidepanel.html</span> <span class="comment">可能微调（script 顺序不变）</span>
+        </div>
+        <p class="caption"><span class="file mod" style="color:var(--rust);font-weight:600;">红色</span> = 大幅修改 &nbsp;·&nbsp; 普通 = 增量修改 &nbsp;·&nbsp; 无新增文件</p>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+
+    <section>
+      <div class="sec-head"><span class="num">02</span><h2>里程碑</h2></div>
+      <p class="sec-intro">6 步渐进增强，每步独立可验证。前 3 步集中在 <code>json-editor.js</code>，第 4 步改造 compare，第 5 步收尾 CSS，第 6 步端到端验证。</p>
+
+      <div class="milestones">
+        <div class="milestone">
+          <div class="when">Step&nbsp;1</div>
+          <div class="dot-col"><span class="dot"></span><span class="line"></span></div>
+          <div class="body">
+            <h3>Tree 模式增强</h3>
+            <p>内联编辑：点击 value/key → 原地 input → Enter 保存 / Esc 取消。节点操作按钮（hover 显示）：Add、Remove、Duplicate。类型标签点击可循环切换 string↔number↔boolean↔null。展开/折叠全部按钮。数组/对象折叠时显示 "{3 items}" 计数。</p>
+            <div class="tags"><span class="tag">lib/json-editor.js</span><span class="tag">sidepanel.css</span></div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="when">Step&nbsp;2</div>
+          <div class="dot-col"><span class="dot"></span><span class="line"></span></div>
+          <div class="body">
+            <h3>Code 模式</h3>
+            <p>新增 Code 标签（与 Tree、Compare 并列）。全宽 textarea + 左侧行号 gutter（同步滚动）+ 底部错误栏显示 Line X, Col Y。可选：textarea 背后放 &lt;pre&gt; 语法高亮覆盖层（透明 textarea 方案）。</p>
+            <div class="tags"><span class="tag">lib/json-editor.js</span></div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="when">Step&nbsp;3</div>
+          <div class="dot-col"><span class="dot"></span><span class="line"></span></div>
+          <div class="body">
+            <h3>操作扩展</h3>
+            <p>Sort keys（递归 Object.keys 排序）、Undo/Redo 历史栈（Ctrl+Z / Ctrl+Shift+Z）、Download（Blob + &lt;a&gt; download）、Upload（隐藏 &lt;input type="file"&gt; + FileReader）。</p>
+            <div class="tags"><span class="tag">lib/json-editor.js</span></div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="when">Step&nbsp;4</div>
+          <div class="dot-col"><span class="dot"></span><span class="line"></span></div>
+          <div class="body">
+            <h3>Compare 结构化 Diff</h3>
+            <p>将逐行文本 diff 替换为 key-path 级结构化比较。递归遍历两个 JSON 对象，标记 added/removed/changed/unchanged。Tree 式 diff 视图：绿色=新增、红色=删除、黄色=修改。保留 Format both / Swap 按钮。</p>
+            <div class="tags"><span class="tag">lib/json-compare.js</span></div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="when">Step&nbsp;5</div>
+          <div class="dot-col"><span class="dot"></span><span class="line"></span></div>
+          <div class="body">
+            <h3>CSS 增强 &amp; 主题适配</h3>
+            <p>所有新增 UI 的样式：编辑态 input、操作按钮、行号 gutter、错误栏、类型标签、diff 视图颜色。暗色主题 `[data-theme="dark"]` 适配全覆盖。</p>
+            <div class="tags"><span class="tag">sidepanel.css</span></div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="when">Step&nbsp;6</div>
+          <div class="dot-col"><span class="dot"></span><span class="line"></span></div>
+          <div class="body">
+            <h3>端到端验证</h3>
+            <p>在 Chrome 中加载扩展，逐条验证下方 10 项验收标准。确保 Tree/Code/Compare 三个模式切换正常、暗色主题完整。</p>
+            <div class="tags"><span class="tag">手动测试</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+
+    <section>
+      <div class="sec-head"><span class="num">03</span><h2>关键决策</h2></div>
+
+      <div class="decisions">
+        <div class="decision">
+          <div class="d-num">Decision 1</div>
+          <div class="d-title">保持纯 vanilla JS，不引入 CodeMirror</div>
+          <div class="d-reason">Chrome 侧边栏宽度仅 ~350px，CodeMirror 完整功能无法充分利用；引入外部库需要构建步骤，破坏当前零依赖架构。textarea + 行号覆盖层方案在此宽度下体验已足够。</div>
+          <div class="d-alt"><strong>被放弃的方案：</strong>引入 CodeMirror 6 提供完整代码编辑体验。放弃原因：需要 npm + bundler，增加 ~500KB，与项目"零构建步骤"理念冲突。</div>
+        </div>
+
+        <div class="decision">
+          <div class="d-num">Decision 2</div>
+          <div class="d-title">Tree 模式保留隐藏的源 textarea 作为数据单一真相源</div>
+          <div class="d-reason">所有操作（内联编辑、排序、撤销）都修改 textarea 值，然后触发 tree 重渲染。undo/redo 历史栈天然基于 input 事件的值快照，不需要额外的状态管理层。</div>
+          <div class="d-alt"><strong>被放弃的方案：</strong>用 JS 对象作为数据源，textare 和 tree 都从对象派生。放弃原因：需要维护双向同步逻辑，undo/redo 需要单独的状态栈，增加复杂度。</div>
+        </div>
+
+        <div class="decision">
+          <div class="d-num">Decision 3</div>
+          <div class="d-title">保持现有 IIFE 模块模式，不拆分为多个文件</div>
+          <div class="d-reason">json-editor.js 虽然会增长到 ~600 行，但仍是一个 cohesive 的模块。拆分为 tree.js / code.js / toolbar.js 需要全局变量通信或事件总线，引入不必要的复杂度。600 行的单文件在 vanilla JS 项目中是可维护的。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+
+    <section>
+      <div class="sec-head"><span class="num">04</span><h2>核心架构</h2></div>
+      <p class="sec-intro">Tree 模式的数据流：textarea 是唯一数据源，tree 是只读渲染。编辑通过临时 input 修改 textarea 值后触发重渲染。</p>
+
+      <div class="code-grid">
+        <div class="code-block">
+          <div class="file-label">Undo/Redo 历史栈结构</div>
+          <div class="code"><pre><span class="cm">// Module-level state</span>
+<span class="kw">var</span> history = {
+  stack: [],    <span class="cm">// [snapshot1, snapshot2, ...]</span>
+  index: <span class="num">-1</span>,      <span class="cm">// current position</span>
+  maxSize: <span class="num">100</span>
+};
+
+<span class="kw">function</span> <span class="fn">pushSnapshot</span>(value) {
+  <span class="cm">// Discard redo history after index</span>
+  history.stack = history.stack.slice(<span class="num">0</span>, history.index + <span class="num">1</span>);
+  history.stack.push(value);
+  <span class="kw">if</span> (history.stack.length > history.maxSize)
+    history.stack.shift();
+  <span class="kw">else</span> history.index++;
+}
+
+<span class="kw">function</span> <span class="fn">undo</span>() {
+  <span class="kw">if</span> (history.index > <span class="num">0</span>) {
+    history.index--;
+    <span class="kw">return</span> history.stack[history.index];
+  }
+  <span class="kw">return null</span>;
+}</pre></div>
+        </div>
+
+        <div class="code-block">
+          <div class="file-label">内联编辑流程（Tree 模式）</div>
+          <div class="code"><pre><span class="cm">// Click handler on tree node value</span>
+<span class="kw">function</span> <span class="fn">startEdit</span>(el, path, currentValue) {
+  <span class="kw">var</span> input = document.createElement(<span class="str">'input'</span>);
+  input.value = currentValue;
+  input.className = <span class="str">'tree-inline-input'</span>;
+
+  <span class="cm">// Replace text with input</span>
+  el.innerHTML = <span class="str">''</span>;
+  el.appendChild(input);
+  input.focus();
+  input.select();
+
+  input.addEventListener(<span class="str">'keydown'</span>, <span class="kw">function</span>(e) {
+    <span class="kw">if</span> (e.key === <span class="str">'Enter'</span>)  commitEdit(path, input.value);
+    <span class="kw">if</span> (e.key === <span class="str">'Escape'</span>) cancelEdit();
+  });
+}
+
+<span class="kw">function</span> <span class="fn">commitEdit</span>(path, newValue) {
+  <span class="cm">// 1. Parse source JSON</span>
+  <span class="cm">// 2. Navigate to path, set new value</span>
+  <span class="cm">// 3. Stringify back to textarea</span>
+  <span class="cm">// 4. pushSnapshot(), renderTree()</span>
+  updateSourceAndRerender(path, newValue);
+}</pre></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+
+    <section>
+      <div class="sec-head"><span class="num">05</span><h2>风险 &amp; 缓解</h2></div>
+      <div class="risks">
+        <div class="row">
+          <div class="cell head">风险</div>
+          <div class="cell head">严重度</div>
+          <div class="cell head">缓解措施</div>
+        </div>
+        <div class="row">
+          <div class="cell">textarea ↔ tree 数据同步不一致：内联编辑后 JSON.stringify 可能改变格式（key 顺序、数字精度），导致用户困惑。</div>
+          <div class="cell"><span class="sev med">MED</span></div>
+          <div class="cell">编辑后始终 beautify（2-space indent）；数字保持原始精度（不强制 number → string 来回）；已在路径上精确定位，不整体替换。</div>
+        </div>
+        <div class="row">
+          <div class="cell">Code 模式行号与 textarea 滚动不同步（不同 OS/字体的 line-height 差异）。</div>
+          <div class="cell"><span class="sev low">LOW</span></div>
+          <div class="cell">用 <code>textarea.scrollTop</code> 驱动行号 div 的 <code>scrollTop</code>，行高用 <code>parseInt(getComputedStyle(textarea).lineHeight)</code> 动态计算。</div>
+        </div>
+        <div class="row">
+          <div class="cell">Compare 结构化 diff 对大型 JSON（>10K 行）的性能问题。</div>
+          <div class="cell"><span class="sev low">LOW</span></div>
+          <div class="cell">递归 diff 本身就是 O(n) 的 key 遍历；如遇性能问题，可在 diff 前添加深度限制（max 50 levels），并显示 "truncated" 警告。实际使用中侧边栏宽度下的 JSON 通常较小。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+
+    <section>
+      <div class="sec-head"><span class="num">06</span><h2>验证清单</h2></div>
+      <p class="sec-intro">在 Chrome 中加载扩展后逐条验证。✅ = 通过，❌ = 失败需修复。</p>
+
+      <div class="checklist">
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">1. Tree 内联编辑</span>
+            <span class="ci-desc">点击 Tree 中任意值的文本 → 出现 input → 修改值 → Enter → tree 更新且源 JSON 同步</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">2. 节点操作</span>
+            <span class="ci-desc">hover 任意 tree 节点 → 看到 Add/Remove/Duplicate 按钮 → 点击各按钮均正确修改 JSON 结构</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">3. 类型转换</span>
+            <span class="ci-desc">点击值的类型标签 → 值在 string ↔ number ↔ boolean ↔ null 间循环切换</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">4. Code 模式行号</span>
+            <span class="ci-desc">切换到 Code 标签 → 看到左侧行号 → 滚动 textarea 行号同步滚动 → 输入无效 JSON 显示错误位置</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">5. Sort keys</span>
+            <span class="ci-desc">点击 Sort 按钮 → 所有 object key 递归按字母排序 → tree 重渲染反映新顺序</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">6. Undo / Redo</span>
+            <span class="ci-desc">修改 JSON → Ctrl+Z 恢复修改前 → Ctrl+Shift+Z 重做修改 → 新编辑丢弃 redo 历史</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">7. Download</span>
+            <span class="ci-desc">点击 Download 按钮 → 浏览器下载 .json 文件 → 内容与编辑器一致</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">8. Upload</span>
+            <span class="ci-desc">点击 Upload 按钮 → 选择本地 .json 文件 → 内容加载到编辑器并 beautify</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">9. Compare 结构化 diff</span>
+            <span class="ci-desc">切换到 Compare → 输入两个不同 JSON → 看到带颜色的 tree diff（非逐行文本 diff）→ Format both / Swap 可用</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" disabled>
+          <div class="ci-body">
+            <span class="ci-title">10. 暗色主题</span>
+            <span class="ci-desc">切换到暗色主题 → Tree / Code / Compare 三个模式所有 UI 正确适配</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  <footer style="margin-top: 80px; padding-top: 24px; border-top: 1.5px solid var(--gray-300); font-size: 12px; color: var(--gray-500);">
+      Approved plan baseline (frozen at 2026-06-14). Live execution state: see docs/exec-plans/active/json-editor-enhancement.md
+    </footer>
+  </div>
+</body>
+</html>

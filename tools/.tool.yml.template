@@ -1,0 +1,22 @@
+# .tool.yml — 工具声明文件模板
+
+# 复制此文件到你的工具目录，修改以下字段
+
+name: my-tool               # 工具名称，kebab-case
+description: A short description of what this tool does
+artifacts:
+  # --- CLI artifact（命令行工具）---
+  # - type: cli
+  #   runtime: node        # node | python | go
+  #   entry: src/index.ts  # 入口文件
+  #   install: npm install -g @toolkit/my-tool
+
+  # --- Chrome Extension artifact（浏览器扩展）---
+  # - type: chrome-extension
+  #   source_dir: extension/
+  #   output: my-tool-extension.zip
+
+  # --- Web artifact（静态 Web 应用）---
+  # - type: web
+  #   source_dir: web/
+  #   output_dir: dist/web/

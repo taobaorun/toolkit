@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "ToolKit",
+  "version": "1.0.0",
+  "description": "A lightweight collection of developer utilities — JSON viewer, Cookie inspector, Markdown reader, and AI Chat.",
+  "permissions": [
+    "sidePanel",
+    "cookies",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      },
+      "description": "Open ToolKit side panel"
+    }
+  },
+  "action": {
+    "default_title": "ToolKit"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
