@@ -50,9 +50,7 @@ var JsonEditor = (function () {
       '<div id="jsonTreeArea" class="json-editor-area">' +
         '<div class="json-editor-pane">' +
           '<div class="pane-label">SOURCE</div>' +
-          '<textarea id="jsonSource" class="json-textarea" placeholder="Paste JSON here..." spellcheck="false">' +
-            escapeHtml(JSON.stringify(getDefaultJson(), null, 2)) +
-          '</textarea>' +
+          '<textarea id="jsonSource" class="json-textarea" placeholder="Paste JSON here..." spellcheck="false"></textarea>' +
         '</div>' +
         '<div class="json-tree-pane">' +
           '<div class="pane-label">' +
@@ -67,9 +65,7 @@ var JsonEditor = (function () {
       '<div id="jsonCodeArea" class="json-code-area hidden">' +
         '<div class="json-code-layout">' +
           '<div class="line-numbers" id="lineNumbers"></div>' +
-          '<textarea id="jsonCodeSource" class="json-code-textarea" placeholder="Paste JSON here..." spellcheck="false">' +
-            escapeHtml(JSON.stringify(getDefaultJson(), null, 2)) +
-          '</textarea>' +
+          '<textarea id="jsonCodeSource" class="json-code-textarea" placeholder="Paste JSON here..." spellcheck="false"></textarea>' +
         '</div>' +
         '<div id="jsonCodeError" class="json-code-error hidden"></div>' +
       '</div>' +
@@ -78,15 +74,11 @@ var JsonEditor = (function () {
         '<div class="json-compare-panes">' +
           '<div class="json-compare-pane">' +
             '<div class="pane-label">A — ORIGINAL</div>' +
-            '<textarea id="jsonCompareA" class="json-textarea" placeholder="Paste original JSON..." spellcheck="false">' +
-              escapeHtml(JSON.stringify(getDefaultJson(), null, 2)) +
-            '</textarea>' +
+            '<textarea id="jsonCompareA" class="json-textarea" placeholder="Paste original JSON..." spellcheck="false"></textarea>' +
           '</div>' +
           '<div class="json-compare-pane">' +
             '<div class="pane-label">B — CHANGED</div>' +
-            '<textarea id="jsonCompareB" class="json-textarea" placeholder="Paste changed JSON..." spellcheck="false">' +
-              escapeHtml(JSON.stringify(getDefaultChanged(), null, 2)) +
-            '</textarea>' +
+            '<textarea id="jsonCompareB" class="json-textarea" placeholder="Paste changed JSON..." spellcheck="false"></textarea>' +
           '</div>' +
         '</div>' +
         '<div class="json-compare-toolbar" id="jsonCompareToolbar"></div>' +
@@ -448,6 +440,8 @@ var JsonEditor = (function () {
   function renderTree() {
     var tree = document.getElementById('jsonTree');
     var src = document.getElementById('jsonSource').value;
+    // A blank editor is the empty state, not an error.
+    if (src.trim() === '') { tree.innerHTML = ''; return; }
     try {
       var data = JSON.parse(src);
       tree.innerHTML = '<div class="json-tree-root">' + renderNode(data, '', 0, []) + '</div>';
@@ -826,6 +820,12 @@ var JsonEditor = (function () {
   function showCodeError() {
     var ta = document.getElementById('jsonCodeSource');
     var errDiv = document.getElementById('jsonCodeError');
+    // A blank editor is the empty state, not an error.
+    if (ta.value.trim() === '') {
+      errDiv.classList.add('hidden');
+      errDiv.textContent = '';
+      return;
+    }
     try {
       JSON.parse(ta.value);
       errDiv.classList.add('hidden');
@@ -969,36 +969,6 @@ var JsonEditor = (function () {
 
   function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  function getDefaultJson() {
-    return {
-      user: {
-        id: 4821,
-        name: "Ada Lovelace",
-        email: "ada@toolkit.dev",
-        active: true,
-        roles: ["admin", "editor"],
-        settings: { theme: "dark", notifications: false }
-      },
-      session: { token: "tk_live_9f8c2a", expiresIn: 3600 },
-      meta: null
-    };
-  }
-
-  function getDefaultChanged() {
-    return {
-      user: {
-        id: 4821,
-        name: "Ada Lovelace",
-        email: "ada.lovelace@toolkit.dev",
-        active: false,
-        roles: ["admin", "editor", "viewer"],
-        settings: { theme: "light", notifications: false }
-      },
-      session: { token: "tk_live_7b1d4e", expiresIn: 7200 },
-      meta: { version: 2 }
-    };
   }
 
   return { render: render };

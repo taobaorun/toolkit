@@ -7,7 +7,8 @@
     "sidePanel",
     "cookies",
     "activeTab",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"

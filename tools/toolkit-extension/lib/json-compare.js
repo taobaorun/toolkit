@@ -28,6 +28,11 @@ var JsonCompare = (function () {
     var diffMode = 'structural';
 
     var renderDiff = function () {
+      // Both panes empty is the initial state, not an error.
+      if (taA.value.trim() === '' && taB.value.trim() === '') {
+        diffView.innerHTML = '';
+        return;
+      }
       if (diffMode === 'structural') {
         renderStructuralDiff(taA, taB, diffView);
       } else {
