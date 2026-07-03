@@ -72,4 +72,13 @@
   // --- Init ---------------------------------------------------------
 
   switchTab('json');
+
+  // If the active tab is a Markdown page, jump straight to the Markdown
+  // tab (which then loads it and switches to Preview). Falls back to the
+  // default JSON tab when the page isn't Markdown or can't be read.
+  if (typeof MarkdownModule !== 'undefined' && MarkdownModule.probeActivePage) {
+    MarkdownModule.probeActivePage(function (isMarkdown) {
+      if (isMarkdown && currentTab !== 'markdown') switchTab('markdown');
+    });
+  }
 })();

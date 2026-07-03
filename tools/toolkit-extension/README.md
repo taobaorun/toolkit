@@ -6,7 +6,7 @@ A lightweight collection of developer utilities, right in your browser side pane
 
 - **JSON viewer** — collapsible tree view, Beautify/Minify, search, side-by-side diff & compare
 - **Cookie inspector** — view all cookies for the current site, search, export as JSON
-- **Markdown reader** — Source / Split / Preview views with live rendering
+- **Markdown reader** — Source / Split / Preview views with live rendering; auto-detects the current page's Markdown (raw `.md` files incl. local `file://`, `raw.githubusercontent.com`, `text/plain`). When you open the panel on a Markdown page it jumps to this tab in **Preview**; a **Load page** button re-fetches on demand. Reading local files needs *Allow access to file URLs* enabled for the extension
 - **AI Chat** — quick prompts for page analysis, multi-turn conversation
 
 ## Install
@@ -44,3 +44,4 @@ make build-toolkit-extension
 | `cookies` | Cookie inspector tab |
 | `activeTab` | Context-aware AI Chat |
 | `tabs` | Current page URL |
+| `scripting` | Read the current page's content for the Markdown reader |

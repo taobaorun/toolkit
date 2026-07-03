@@ -772,6 +772,15 @@ textarea::placeholder, input::placeholder { color: var(--text-3); }
   border-color: transparent;
 }
 
+.md-status {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .md-container {
   flex: 1; display: flex; overflow: hidden;
   border-top: 1px solid var(--border);

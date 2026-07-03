@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExecPlan — Markdown 模块自动识别并渲染当前页</title>
+  <style>
+    :root {
+      --ivory:    #FAF9F5;
+      --slate:    #141413;
+      --clay:     #D97757;
+      --oat:      #E3DACC;
+      --olive:    #788C5D;
+      --gray-150: #F0EEE6;
+      --gray-300: #D1CFC5;
+      --gray-500: #87867F;
+      --gray-700: #3D3D3A;
+      --white:    #FFFFFF;
+      --serif: ui-serif, Georgia, 'Times New Roman', serif;
+      --sans:  system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --mono:  ui-monospace, 'SF Mono', Menlo, Monaco, monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--sans);
+      background: var(--ivory);
+      color: var(--gray-700);
+      line-height: 1.55;
+      padding: 56px 32px 120px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 1080px; margin: 0 auto; }
+
+    header.page-head { margin-bottom: 44px; max-width: 860px; }
+    .eyebrow {
+      font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--gray-500); margin-bottom: 12px;
+    }
+    h1 {
+      font-family: var(--serif); font-weight: 500; font-size: 34px;
+      line-height: 1.18; color: var(--slate); margin-bottom: 18px; letter-spacing: -0.01em;
+    }
+    .goal-box {
+      background: var(--gray-150); border: 1.5px solid var(--gray-300);
+      border-radius: 12px; padding: 16px 20px; font-size: 15px; color: var(--gray-700);
+    }
+    .goal-box .label {
+      font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--gray-500); display: block; margin-bottom: 6px;
+    }
+    .goal-box b { color: var(--slate); }
+
+    /* status banner */
+    .status {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 20px; padding: 13px 18px;
+      background: #FBEEE8; border: 1.5px solid var(--clay); border-radius: 10px;
+      font-size: 14px; color: #8A3B1E;
+    }
+    .status .pill {
+      font-family: var(--mono); font-size: 11px; font-weight: 600;
+      background: var(--clay); color: var(--white); padding: 3px 10px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0;
+    }
+
+    section { margin-bottom: 58px; }
+    .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+    .sec-head .num {
+      font-family: var(--mono); font-size: 12px; background: var(--oat);
+      color: var(--slate); padding: 3px 9px; border-radius: 8px;
+    }
+    .sec-head h2 {
+      font-family: var(--serif); font-weight: 500; font-size: 25px;
+      color: var(--slate); letter-spacing: -0.01em;
+    }
+    .sec-intro { font-size: 14.5px; color: var(--gray-500); max-width: 760px; margin-bottom: 26px; margin-top: 6px; }
+
+    /* summary strip */
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 56px; }
+    @media (max-width: 900px) { .summary { grid-template-columns: repeat(2, 1fr); } }
+    .summary .cell {
+      background: var(--white); border: 1.5px solid var(--gray-300);
+      border-radius: 12px; padding: 18px 20px;
+    }
+    .summary .k {
+      font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--gray-500); margin-bottom: 6px;
+    }
+    .summary .v { font-size: 17px; color: var(--slate); font-weight: 600; }
+    .summary .v.accent { color: var(--clay); }
+
+    /* assumptions */
+    .assume { display: flex; flex-direction: column; gap: 12px; max-width: 860px; }
+    .assume .a {
+      background: var(--white); border: 1.5px solid var(--gray-300);
+      border-left: 4px solid var(--olive); border-radius: 10px; padding: 14px 18px;
+    }
+    .assume .a .at { font-weight: 600; font-size: 14.5px; color: var(--slate); margin-bottom: 3px; }
+    .assume .a .ad { font-size: 13.5px; color: var(--gray-500); }
+
+    /* file tree */
+    .tree {
+      background: var(--slate); border-radius: 12px; padding: 22px 24px; overflow-x: auto;
+    }
+    .tree pre { font-family: var(--mono); font-size: 13px; line-height: 1.75; color: #E8E6DE; white-space: pre; }
+    .tree .dir  { color: var(--gray-500); }
+    .tree .edit { color: var(--clay); font-weight: 600; }
+    .tree .new  { color: #C9B98A; }
+    .tree .tag {
+      font-family: var(--mono); font-size: 10.5px; padding: 1px 7px; border-radius: 5px;
+      margin-left: 8px; vertical-align: middle;
+    }
+    .tree .tag.mod { background: #5a3226; color: #F3D9CC; }
+    .tree .tag.doc { background: #3a4230; color: #d7e0c8; }
+    .caption { font-size: 13px; color: var(--gray-500); margin-top: 12px; }
+
+    /* decisions */
+    .decisions { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .dec {
+      background: var(--white); border: 1.5px solid var(--gray-300); border-radius: 12px;
+      padding: 18px 22px;
+    }
+    .dec .dt { font-weight: 600; font-size: 15.5px; color: var(--slate); margin-bottom: 6px; }
+    .dec .dt .chosen {
+      font-family: var(--mono); font-size: 11px; background: var(--oat); color: var(--slate);
+      padding: 2px 8px; border-radius: 6px; margin-left: 8px; font-weight: 500;
+    }
+    .dec .why { font-size: 14px; color: var(--gray-700); }
+    .dec .why .lead { color: var(--gray-500); }
+
+    /* steps */
+    .milestones { display: flex; flex-direction: column; }
+    .milestone { display: grid; grid-template-columns: 40px 1fr; gap: 0 18px; position: relative; }
+    .milestone .dot-col { display: flex; flex-direction: column; align-items: center; }
+    .milestone .dot {
+      width: 28px; height: 28px; border-radius: 50%; background: var(--white);
+      border: 2px solid var(--clay); color: var(--clay); flex-shrink: 0; margin-top: 2px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--mono); font-size: 12px; font-weight: 600;
+    }
+    .milestone .line { width: 2px; flex: 1; background: var(--gray-300); margin: 4px 0; }
+    .milestone:last-child .line { display: none; }
+    .milestone .body { padding-bottom: 30px; }
+    .milestone .body h3 { font-family: var(--serif); font-weight: 500; font-size: 19px; color: var(--slate); margin-bottom: 5px; }
+    .milestone .body p { font-size: 14px; color: var(--gray-500); margin-bottom: 10px; max-width: 680px; }
+    .milestone .body .files { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .milestone .tag-file {
+      font-family: var(--mono); font-size: 11.5px; background: var(--gray-150);
+      border: 1px solid var(--gray-300); border-radius: 6px; padding: 3px 8px; color: var(--gray-700);
+    }
+    .accept {
+      background: var(--gray-150); border: 1px solid var(--gray-300); border-radius: 8px;
+      padding: 10px 14px; font-size: 13.5px; color: var(--gray-700); max-width: 680px;
+    }
+    .accept .ak {
+      font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--olive); font-weight: 600; margin-right: 8px;
+    }
+
+    /* verification list */
+    .verify { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
+    .v-row {
+      display: grid; grid-template-columns: 150px 1fr; gap: 0;
+      background: var(--white); border: 1.5px solid var(--gray-300); border-radius: 10px; overflow: hidden;
+    }
+    @media (max-width: 720px) { .v-row { grid-template-columns: 1fr; } }
+    .v-row .scene {
+      background: var(--gray-150); padding: 14px 16px; font-weight: 600; font-size: 13.5px; color: var(--slate);
+      border-right: 1.5px solid var(--gray-300);
+    }
+    @media (max-width: 720px) { .v-row .scene { border-right: none; border-bottom: 1px dashed var(--gray-300); } }
+    .v-row .expect { padding: 14px 18px; font-size: 13.5px; color: var(--gray-700); }
+    .v-row .expect code { font-family: var(--mono); font-size: 12.5px; background: var(--gray-150); padding: 1px 5px; border-radius: 4px; }
+
+    .foot-note { margin-top: 40px; font-size: 13px; color: var(--gray-500); max-width: 760px; border-top: 1px solid var(--gray-300); padding-top: 18px; }
+    .foot-note code { font-family: var(--mono); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="page-head">
+      <div class="eyebrow">ExecPlan · 评审版 · toolkit-extension</div>
+      <h1>Markdown 模块自动识别并渲染当前页内容</h1>
+      <div class="goal-box">
+        <span class="label">目标</span>
+        用户打开一个 <b>原始 Markdown 页面</b>（<code>*.md</code> 文件 / <code>raw.githubusercontent.com</code> / <code>text/plain</code>），切到侧边栏 <b>Markdown</b> 标签 —— 扩展<b>自动抓取该页文本、载入源码框、渲染预览</b>，无需复制粘贴。非 md 页面则回退抓取整页可见正文，并提供 "Load page" 按钮随时手动刷新。
+      </div>
+      <div class="status" style="background:#EDF1E6;border-color:var(--olive);color:#4B5C39">
+        <span class="pill" style="background:var(--olive)">已批准</span>
+        <span>方案已于 <b>2026-07-03 09:05 GMT+8</b> 冻结为基线。执行状态请见 MD 版：<code>docs/exec-plans/active/markdown-auto-detect-page.md</code>。本 HTML 不再更新。</span>
+      </div>
+    </header>
+
+    <div class="summary">
+      <div class="cell"><div class="k">改动文件</div><div class="v accent">3 个</div></div>
+      <div class="cell"><div class="k">新增权限</div><div class="v">scripting</div></div>
+      <div class="cell"><div class="k">新第三方依赖</div><div class="v">0</div></div>
+      <div class="cell"><div class="k">预计步骤</div><div class="v">5 步</div></div>
+    </div>
+
+    <!-- ============ 假设 ============ -->
+    <section>
+      <div class="sec-head"><span class="num">01</span><h2>假设</h2></div>
+      <p class="sec-intro">你在澄清问题上暂未回复，以下是我采用的默认判断 —— 如与预期不符请指出。</p>
+      <div class="assume">
+        <div class="a">
+          <div class="at">检测范围 = 两者结合</div>
+          <div class="ad">优先识别原始 markdown 页面（最精准）；若不是，回退抓取整页可见文本作为 markdown 源。覆盖面最广。</div>
+        </div>
+        <div class="a">
+          <div class="at">加载时机 = 自动一次 + 可手动刷新</div>
+          <div class="ad">切到 Markdown 标签时自动抓取一次；另有 "Load page" 按钮可手动重抓。满足"自动"诉求同时保留可控性。</div>
+        </div>
+        <div class="a">
+          <div class="at">不覆盖用户输入</div>
+          <div class="ad">自动加载仅在源码框为空或仍是初始示例时才写入，避免冲掉用户已编辑的内容；手动按钮则强制覆盖。</div>
+        </div>
+        <div class="a">
+          <div class="at">不可注入页面优雅降级</div>
+          <div class="ad"><code>chrome://</code> / <code>file://</code> / 无 <code>chrome.scripting</code> 时不报错，保留示例，状态提示"Page loading unavailable here"。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 影响范围 ============ -->
+    <section>
+      <div class="sec-head"><span class="num">02</span><h2>影响范围</h2></div>
+      <p class="sec-intro">仅触及 Markdown 相关的三个文件，其余模块与构建不受影响。</p>
+      <div class="tree">
+<pre><span class="dir">tools/toolkit-extension/</span>
+├── <span class="edit">manifest.json</span><span class="tag mod">MOD</span>          permissions 追加 "scripting"
+├── lib/
+│   └── <span class="edit">markdown.js</span><span class="tag mod">MOD</span>        抓取 + 自动识别 + "Load page" 按钮 + 状态提示
+├── <span class="edit">README.md</span><span class="tag doc">DOC</span>              Markdown 功能条目补充"自动识别当前页"
+│
+├── sidepanel.html          <span class="dir">— 无需改，脚本已引入</span>
+├── sidepanel.js            <span class="dir">— 无需改，switchTab 已调用 render()</span>
+└── lib/marked.min.js       <span class="dir">— 复用现有渲染器</span></pre>
+      </div>
+      <p class="caption">读取当前标签页沿用 <code>cookies.js</code> 的既有范式；渲染沿用全局 <code>marked</code>。零新增依赖。</p>
+    </section>
+
+    <!-- ============ 关键决策 ============ -->
+    <section>
+      <div class="sec-head"><span class="num">03</span><h2>关键决策</h2></div>
+      <div class="decisions">
+        <div class="dec">
+          <div class="dt">读取页面用 <code style="font-family:var(--mono);font-size:14px">chrome.scripting.executeScript</code> 而非 <code style="font-family:var(--mono);font-size:14px">fetch(tab.url)</code><span class="chosen">已选</span></div>
+          <div class="why"><span class="lead">理由：</span>executeScript 能同时拿到"是否原始 markdown（单一 <code>&lt;pre&gt;</code> / <code>text/plain</code>）"的判断和渲染后可见文本；<code>fetch</code> 对普通网页只能拿到 HTML 源码，无法满足"回退抓取正文"的需求。代价是需新增 <code>scripting</code> 权限（注入目标已由现有 <code>&lt;all_urls&gt;</code> 覆盖）。</div>
+        </div>
+        <div class="dec">
+          <div class="dt">自动加载采用"空/示例才覆盖"的保护策略<span class="chosen">已选</span></div>
+          <div class="why"><span class="lead">理由：</span>纯"每次打开都自动覆盖"会冲掉用户正在编辑的草稿；纯"只按钮"又不够"自动"。折中：render 时自动尝试一次，但只在源码框为空或等于初始示例时写入。这是比全自动更简单且更安全的方案。</div>
+        </div>
+        <div class="dec">
+          <div class="dt">识别信号 = 内容结构 + URL 后缀双重判断<span class="chosen">已选</span></div>
+          <div class="why"><span class="lead">理由：</span>单看 <code>document.contentType</code> 会漏掉部分被包成 <code>&lt;pre&gt;</code> 的原始页；单看 URL 后缀会漏掉无 <code>.md</code> 后缀的 raw 链接。两者结合把误判降到最低。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 步骤 ============ -->
+    <section>
+      <div class="sec-head"><span class="num">04</span><h2>执行步骤与验证标准</h2></div>
+      <p class="sec-intro">五步，每步都有可验证的完成标准。</p>
+      <div class="milestones">
+
+        <div class="milestone">
+          <div class="dot-col"><span class="dot">1</span><span class="line"></span></div>
+          <div class="body">
+            <h3>补 scripting 权限</h3>
+            <p>在 <code>manifest.json</code> 的 <code>permissions</code> 数组追加 <code>"scripting"</code>。</p>
+            <div class="files"><span class="tag-file">manifest.json</span></div>
+            <div class="accept"><span class="ak">验收</span>重载扩展无权限报错，<code>chrome.scripting</code> 在侧边栏可用。</div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="dot-col"><span class="dot">2</span><span class="line"></span></div>
+          <div class="body">
+            <h3>抓取 + 自动识别逻辑</h3>
+            <p>toolbar 加 "Load page" 按钮和状态提示 span；新增 <code>loadFromPage(auto)</code>：query 当前标签 → <code>executeScript</code> 注入 <code>extractPageContent()</code> 取回 <code>{isRaw, url, text}</code> → 结合 URL 后缀强化判断 → 写入源码框并 <code>renderPreview()</code>。</p>
+            <div class="files"><span class="tag-file">lib/markdown.js</span></div>
+            <div class="accept"><span class="ak">验收</span>打开 raw <code>.md</code> 链接点 Markdown 标签，源码框出现文件全文，预览渲染出标题/列表/代码块。</div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="dot-col"><span class="dot">3</span><span class="line"></span></div>
+          <div class="body">
+            <h3>降级 + 不覆盖输入</h3>
+            <p>无 <code>chrome.scripting</code> / 不可注入页 → 保留示例并给状态提示；<code>auto</code> 模式仅在源码框空或等于初始示例时写入。</p>
+            <div class="files"><span class="tag-file">lib/markdown.js</span></div>
+            <div class="accept"><span class="ak">验收</span>停在 <code>chrome://extensions</code> 不报错、保留示例；手动编辑后切走再切回不被覆盖。</div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="dot-col"><span class="dot">4</span><span class="line"></span></div>
+          <div class="body">
+            <h3>更新 README</h3>
+            <p>在扩展 <code>README.md</code> 的 Markdown 功能条目补充"自动识别当前页内容并渲染"。</p>
+            <div class="files"><span class="tag-file">README.md</span></div>
+            <div class="accept"><span class="ak">验收</span>README 功能列表准确反映新能力。</div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div class="dot-col"><span class="dot">5</span></div>
+          <div class="body">
+            <h3>加载扩展手动验证</h3>
+            <p>覆盖三类页面（原始 .md / raw.github / 普通网页）+ 手动刷新 + 不覆盖输入五个场景。</p>
+            <div class="files"><span class="tag-file">chrome://extensions</span></div>
+            <div class="accept"><span class="ak">验收</span>下方验证清单五项全部通过。</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ 验证清单 ============ -->
+    <section>
+      <div class="sec-head"><span class="num">05</span><h2>验证清单（行为验收）</h2></div>
+      <div class="verify">
+        <div class="v-row">
+          <div class="scene">原始 .md 页面</div>
+          <div class="expect">打开 <code>raw.githubusercontent.com/.../README.md</code> → 点 Markdown 标签 → 源码框自动填入全文，预览渲染格式化结果，状态提示来源 host。</div>
+        </div>
+        <div class="v-row">
+          <div class="scene">普通网页</div>
+          <div class="expect">打开一个普通 HTML 页 → 点 Markdown 标签 → 源码框填入该页可见正文，预览按 markdown 渲染（纯文本也正常）。</div>
+        </div>
+        <div class="v-row">
+          <div class="scene">不可注入页</div>
+          <div class="expect">停在 <code>chrome://extensions</code> → 点 Markdown 标签 → 不报错，保留示例，提示 "Page loading unavailable here"。</div>
+        </div>
+        <div class="v-row">
+          <div class="scene">手动刷新</div>
+          <div class="expect">改动源码框后点 "Load page" → 强制重新抓取覆盖，预览更新。</div>
+        </div>
+        <div class="v-row">
+          <div class="scene">不覆盖输入</div>
+          <div class="expect">自动加载后手动编辑源码框，切走标签再切回 → 已编辑内容<b>不被</b>自动加载冲掉。</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="foot-note">
+      <b>Approved plan baseline (frozen at 2026-07-03 09:05 GMT+8).</b> Live execution state: see <code>docs/exec-plans/active/markdown-auto-detect-page.md</code>.
+    </div>
+
+  </div>
+</body>
+</html>
