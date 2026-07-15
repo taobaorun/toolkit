@@ -24,7 +24,7 @@ usage() {
   cat <<EOF
 Usage: mcp-debug <type> <url> <action> [tool_name] [tool_args]
 
-  type       Transport type: sse | streamable
+  type       Transport type: sse | streamable | streamable_stateless
   url        Full MCP service endpoint URL
   action     Debug action: list | call
   tool_name  Tool name (required for 'call' action)
@@ -37,6 +37,7 @@ Examples:
   mcp-debug streamable http://host/mcpserver/streamable/mcp list
   mcp-debug sse http://host/mcpserver/sse list
   mcp-debug streamable http://host/mcpserver/streamable/mcp call my_tool '{}'
+  mcp-debug streamable_stateless http://host/mcpserver/streamable/mcp list
 EOF
   exit 1
 }
@@ -175,7 +176,89 @@ CALL_PARAMS
   esac
 }
 
+# --- Streamable HTTP stateless transport -------------------------------
+
+do_streamable_stateless() {
+  local url="$1"
+  local action="$2"
+  local tool_name="$3"
+  local tool_args="${4:-{}}"
+
+  info "Connecting to Streamable (stateless) endpoint: $url"
+
+  # Stateless: no initialize/initialized handshake, just send the request directly
+  local rpc_body
+  case "$action" in
+    list)
+      info "Listing tools..."
+      rpc_body=$(build_rpc_request "tools/list" 1010 '{}')
+      ;;
+    call)
+      [ -z "$tool_name" ] && die "tool_name is required for 'call' action"
+      info "Calling tool: $tool_name"
+      local call_params="{\"name\":\"$tool_name\",\"arguments\":$tool_args}"
+      rpc_body=$(build_rpc_request "tools/call" 1010 "$call_params")
+      ;;
+    *) die "Unknown action: $action. Use 'list' or 'call'." ;;
+  esac
+
+  local response=$(curl -s \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    --request POST \
+    --data "$rpc_body" \
+    "$url")
+  extract_rpc_result "$response" | format_json
+}
+
 # --- SSE transport ----------------------------------------------------
+
+# Helper: send a JSON-RPC POST and return the response body.
+# Some MCP servers return the JSON-RPC response directly in the POST body
+# (streamable semantics), others only push it through the SSE event stream.
+_sse_post() {
+  local post_url="$1"
+  local rpc_body="$2"
+  local extra_hdrs=("${@:3}")
+
+  curl -s --max-time 30 \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json, text/event-stream" \
+    "${extra_hdrs[@]}" \
+    --request POST \
+    --data "$rpc_body" \
+    "$post_url" 2>&1
+}
+
+# Helper: wait for a data line with a specific JSON-RPC id to appear in the
+# SSE stream file. Reads only new data appended after start_offset.
+_sse_wait_for_response() {
+  local tmpfile="$1"
+  local rpc_id="$2"
+  local start_offset="$3"
+  local timeout_iters="${4:-20}"
+
+  local waited=0
+  while [ $waited -lt $timeout_iters ]; do
+    sleep 0.5
+    waited=$((waited + 1))
+
+    # Read only bytes appended since start_offset, extract data: payloads
+    local new_data=$(tail -c +$((start_offset + 1)) "$tmpfile" 2>/dev/null)
+    local rpc_response=$(echo "$new_data" | grep '^data:' | sed 's/^data:[[:space:]]*//' | tr -d '\r' | while IFS= read -r data_line; do
+      if echo "$data_line" | jq -e ".id == $rpc_id" >/dev/null 2>&1; then
+        echo "$data_line"
+        break
+      fi
+    done)
+
+    if [ -n "$rpc_response" ]; then
+      echo "$rpc_response"
+      return 0
+    fi
+  done
+  return 1
+}
 
 do_sse() {
   local url="$1"
@@ -185,18 +268,17 @@ do_sse() {
 
   info "Connecting to SSE endpoint: $url"
 
-  # Use temp file for SSE stream output
   local tmpfile=$(mktemp /tmp/mcp-debug-sse.XXXXXX)
-  # Cleanup on exit
-  trap "rm -f $tmpfile; [ -n \"$CURL_PID\" ] && kill $CURL_PID 2>/dev/null || true" EXIT
+  trap "rm -f $tmpfile; [ -n \"$SSE_PID\" ] && kill $SSE_PID 2>/dev/null || true" EXIT
 
-  # Step 1: start SSE connection in background
-  info "Starting SSE connection..."
+  # =========================================================================
+  # PHASE 1 — Bootstrap: open SSE stream, extract session-scoped message URL
+  # =========================================================================
+  info "Opening SSE stream..."
   curl -s -N "$url" > "$tmpfile" 2>&1 &
-  CURL_PID=$!
+  SSE_PID=$!
 
-  # Step 2: wait for and extract session ID from SSE endpoint event
-  info "Waiting for SSE endpoint event..."
+  info "Waiting for endpoint event..."
   local session_id=""
   local message_url=""
   local waited=0
@@ -204,61 +286,62 @@ do_sse() {
     sleep 0.5
     waited=$((waited + 1))
 
-    # Look for the endpoint event in SSE stream
-    # SSE format: "event: endpoint\ndata: <url>"
-    local endpoint_data=$(grep -A1 'event: endpoint' "$tmpfile" 2>/dev/null | grep 'data:' | head -1 | sed 's/^data:[[:space:]]*//')
+    local endpoint_data=$(grep -E -A1 'event:[[:space:]]*endpoint' "$tmpfile" 2>/dev/null | grep 'data:' | head -1 | sed 's/^data:[[:space:]]*//')
 
     if [ -n "$endpoint_data" ]; then
       message_url="$endpoint_data"
-      # Extract sessionId from URL query parameter
       session_id=$(echo "$message_url" | grep -o 'sessionId=[^&]*' | cut -d= -f2)
       break
     fi
   done
 
-  if [ -z "$session_id" ]; then
-    # Try alternative: session ID might be in the URL itself as a path segment
-    # or some servers send it as a separate event
-    die "Failed to get session ID from SSE stream after ${waited}s.\nSSE output so far:\n$(head -20 "$tmpfile")"
-  fi
+  [ -z "$session_id" ] && die "Failed to get session ID from SSE stream after ~$((waited / 2))s.\nSSE output so far:\n$(head -20 "$tmpfile")"
+  info "Session ID: $session_id"
 
-  info "Got session ID: $session_id"
-
-  # Step 3: determine message POST URL
-  # If endpoint event gave full URL, use it; otherwise derive from base
+  # Build the POST URL from the endpoint event
   local post_url
   if echo "$message_url" | grep -q '^http'; then
     post_url="$message_url"
   else
-    # Derive base from the SSE URL (strip /sse suffix or use parent path)
     local base_url="${url%/sse}"
-    post_url="${base_url}/mcp/message?sessionId=${session_id}"
+    post_url="${base_url}${message_url}"
   fi
-  info "Message endpoint: $post_url"
+  info "POST endpoint: $post_url"
 
-  # Step 4: send initialize via POST (response comes back through SSE stream)
+  # =========================================================================
+  # PHASE 2 — Handshake: initialize → initialized
+  # =========================================================================
+
+  # Record SSE file offset before each POST so we can read only new data
+  local sse_offset=$(wc -c < "$tmpfile")
+
   info "Sending initialize..."
-  local init_body=$(build_rpc_request "initialize" 0 '{"protocolVersion":"2024-11-05","capabilities":{"sampling":{},"roots":{"listChanged":true}},"clientInfo":{"name":"mcp-debug","version":"1.0.0"}}')
+  local init_body=$(build_rpc_request "initialize" 0 '{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"mcp-debug","version":"1.0.0"}}')
+  local init_resp=$(_sse_post "$post_url" "$init_body")
 
-  curl -s -o /dev/null \
-    -H "Content-Type: application/json" \
-    -H "Accept: text/event-stream" \
-    --request POST \
-    --data "$init_body" \
-    "$post_url" 2>&1 || warn "initialize POST returned non-zero"
+  # Check if initialize response came as a direct POST body (streamable-style)
+  if echo "$init_resp" | jq -e ".id == 0" >/dev/null 2>&1; then
+    info "Got initialize response in POST body (streamable semantics)"
+  else
+    # Response should be in SSE stream — wait for it
+    info "Waiting for initialize response via SSE stream..."
+    init_resp=$(_sse_wait_for_response "$tmpfile" 0 "$sse_offset" 10)
+    [ -z "$init_resp" ] && die "No initialize response received.\nPOST body: $init_resp\nSSE data:\n$(grep '^data:' "$tmpfile" | sed 's/^data:[[:space:]]*//')"
+  fi
 
-  # Step 5: send notifications/initialized
+  # Extract server capabilities for protocol negotation (optional)
+  local protocol_version=$(echo "$init_resp" | jq -r '.result.protocolVersion // "2024-11-05"' 2>/dev/null)
+
+  # Update SSE offset for next read
+  sse_offset=$(wc -c < "$tmpfile")
+
   info "Sending notifications/initialized..."
   local notif_body=$(build_rpc_request "notifications/initialized" 1 '{}')
+  _sse_post "$post_url" "$notif_body" > /dev/null
 
-  curl -s -o /dev/null \
-    -H "Content-Type: application/json" \
-    -H "Accept: text/event-stream" \
-    --request POST \
-    --data "$notif_body" \
-    "$post_url" 2>&1 || warn "notifications/initialized returned non-zero"
-
-  # Step 6: send the requested action
+  # =========================================================================
+  # PHASE 3 — Execute the requested action
+  # =========================================================================
   local rpc_id=1010
   local rpc_body
   case "$action" in
@@ -275,62 +358,31 @@ do_sse() {
     *) die "Unknown action: $action. Use 'list' or 'call'." ;;
   esac
 
-  # Clear previous SSE output to avoid reading stale responses
-  > "$tmpfile"
+  sse_offset=$(wc -c < "$tmpfile")
 
-  curl -s -o /dev/null \
-    -H "Content-Type: application/json" \
-    -H "Accept: text/event-stream" \
-    --request POST \
-    --data "$rpc_body" \
-    "$post_url" 2>&1
+  local action_resp=$(_sse_post "$post_url" "$rpc_body")
 
-  # Step 7: read JSON-RPC response from SSE stream
-  info "Waiting for response..."
-  waited=0
-  while [ $waited -lt 20 ]; do
-    sleep 0.5
-    waited=$((waited + 1))
+  # Try direct POST body first
+  if echo "$action_resp" | jq -e ".id == $rpc_id" >/dev/null 2>&1; then
+    extract_rpc_result "$action_resp" | format_json
+    return 0
+  fi
 
-    # Parse SSE data lines — collect lines with "data:" after our rpc id
-    # The response should contain "id": $rpc_id in the data payload
-    local all_data=$(grep '^data:' "$tmpfile" 2>/dev/null | sed 's/^data:[[:space:]]*//' | tr '\n' ' ')
+  # Fallback: response comes through SSE stream
+  info "Waiting for response via SSE stream..."
+  local sse_result=$(_sse_wait_for_response "$tmpfile" "$rpc_id" "$sse_offset" 20)
+  if [ -n "$sse_result" ]; then
+    extract_rpc_result "$sse_result" | format_json
+    return 0
+  fi
 
-    # Look for our specific rpc response by id
-    local rpc_result=$(echo "$all_data" | grep -o "\"id\":$rpc_id[^}]*}" | head -1 || true)
-    if [ -n "$rpc_result" ]; then
-      # Reconstruct full JSON
-      local result_json=$(echo "$all_data" | python3 -c "
-import sys, json
-text = sys.stdin.read()
-# Find the JSON object containing our id
-parts = text.split('{')
-for p in parts:
-    if '\"id\":$rpc_id' in p:
-        obj = '{' + p.rsplit('}', 1)[0] + '}'
-        try:
-            parsed = json.loads(obj)
-            print(json.dumps(parsed, indent=2))
-        except:
-            pass
-        break
-" 2>/dev/null || true)
-
-      if [ -n "$result_json" ]; then
-        # Try to extract result field if it's a JSON-RPC response
-        if echo "$result_json" | jq -e '.result' >/dev/null 2>&1; then
-          extract_rpc_result "$result_json" | format_json
-        else
-          echo "$result_json" | format_json
-        fi
-        return 0
-      fi
-    fi
-  done
-
-  # Fallback: dump whatever we received
-  warn "Timed out waiting for structured response. Raw SSE output:"
-  cat "$tmpfile"
+  # Diagnostics on failure
+  warn "Timed out waiting for response."
+  warn "  POST body: $(echo "$action_resp" | head -c 500)"
+  warn "  SSE data lines since request:"
+  local new_data=$(tail -c +$((sse_offset + 1)) "$tmpfile" 2>/dev/null)
+  echo "$new_data" | grep '^data:' | sed 's/^data:[[:space:]]*//' | head -20
+  die "No response received."
 }
 
 # --- main -------------------------------------------------------------
@@ -347,8 +399,8 @@ main() {
   [ -z "$url" ] && usage
   [ -z "$action" ] && usage
 
-  if [ "$type" != "sse" ] && [ "$type" != "streamable" ]; then
-    die "Unknown transport type: '$type'. Use 'sse' or 'streamable'."
+  if [ "$type" != "sse" ] && [ "$type" != "streamable" ] && [ "$type" != "streamable_stateless" ]; then
+    die "Unknown transport type: '$type'. Use 'sse', 'streamable', or 'streamable_stateless'."
   fi
 
   if [ "$action" != "list" ] && [ "$action" != "call" ]; then
@@ -358,8 +410,9 @@ main() {
   check_deps
 
   case "$type" in
-    streamable) do_streamable "$url" "$action" "$tool_name" "$tool_args" ;;
-    sse)         do_sse "$url" "$action" "$tool_name" "$tool_args" ;;
+    streamable)           do_streamable "$url" "$action" "$tool_name" "$tool_args" ;;
+    streamable_stateless) do_streamable_stateless "$url" "$action" "$tool_name" "$tool_args" ;;
+    sse)                  do_sse "$url" "$action" "$tool_name" "$tool_args" ;;
   esac
 }
 
